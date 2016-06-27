@@ -5,7 +5,7 @@ import numpy as np
 import struct
 
 # from kanerva import *
-# k = KanervaCoder(3, [0,0,0,0,0], [10, 10, 10, 10, 10], 'random', 'hamming')
+# k = KanervaCoder(50, [0,0, -2, -2 ,-2], [4.5, 4.5, 2 ,2 ,2], 'random', 'hamming')
 # observation = [2.0, 4.0, 7.0, 3.0, 9.0]
 # k.GetFeatures(observation)
 
@@ -68,9 +68,16 @@ class KanervaCoder:
 				# find the maximum bit size if every float was represented together
 				self.prototypes = []
 				for i in range(self.numPrototypes):
-					tempPrototype = [self.floatToBits(random.random()*self.ranges[j] + self.lowerBounds[j]) for j in range(self.dimensions)]
+					tempPrototype = []
+					for j in range(self.dimensions):
+						tempDimension = self.floatToBits(random.random()*self.ranges[j] + self.lowerBounds[j])
+						print(tempDimension)
+						tempPrototype.append(tempDimension)
 					if i > 0:
+						print('Calculating threshold')
 						self.threshold = self.threshold + (self.initHamming(tempPrototype, i-1) - self.threshold)/(i+1)
+						print('Calculated threshold')
+					print('Appended the prototype')
 					self.prototypes.append(tempPrototype)
 				self.prototypes = np.array(self.prototypes)
 				
@@ -84,8 +91,10 @@ class KanervaCoder:
 		#assert len(x) == len(prototypes(i))
 		prototype = self.prototypes[i]
 		count = 0
+		print('In calculate threshold')
 		for j in range(self.dimensions):
-			z = int(data[j],16)^int(prototype[j],16)
+			print('On dimension ' + str(j))
+			z = int(data[j],16) & int(prototype[j],16)
 			while z:
 				count += 1
 				z &= z-1 # magic!
@@ -97,7 +106,7 @@ class KanervaCoder:
 		prototype = self.prototypes[i]
 		count = 0
 		for j in range(self.dimensions):
-			z = int(self.floatToBits(data[j]),16)^int(prototype[j],16)
+			z = int(self.floatToBits(data[j]),16) & int(prototype[j],16)
 			while z:
 				count += 1
 				z &= z-1 # magic!
