@@ -90,15 +90,12 @@ counter(0)
     setLearnerFeatures();
 }
 
-
-TcpLearning::~TcpLearning(void)
-{
+TcpLearning::~TcpLearning(void){
 }
 
+void TcpLearning::GenerateFeatureVectorFromFile(){
 
-void TcpLearning::GenerateFeatureVectorFromFile()
-// Generate the features from file
-{
+	// Generate the features from file
 
     FILE *filefeature;
     string subPath = "foo_folder/";
@@ -120,12 +117,11 @@ void TcpLearning::GenerateFeatureVectorFromFile()
         s[2] = rtt;
         s[3] = threshold;
         features_1[fIndex].setFixed(s, actionValue);     }
-
 }
 
-
 void TcpLearning::GenerateFeatureVector() {
-// Generate the features randomly
+
+	// Generate the features randomly
 	std::cout << "= Feature Generation (randomly distribution) " << NumFeatures << std::endl;
 	int fDiff;
 	for (int fIndex = 0; fIndex < NumFeatures; fIndex++) {
@@ -141,17 +137,12 @@ void TcpLearning::GenerateFeatureVector() {
 			}
 		}
 	}
-
 }
-
-
 
 void TcpLearning::setLearnerFeatures() {
 	ai.setFeatures(features_1);
 	ai.computeFeatureWidth(); //// must recall this once the set of features has changed
 }
-
-
 
 //// GetLearning is called every time step
 void TcpLearning::GetLearning(void) {
@@ -169,61 +160,43 @@ void TcpLearning::GetLearning(void) {
         
         double reward = 0;
         
-        if (!firstTime)
-        {
-            
+        if (!firstTime) {
             if (m_utility <= m_pre_utility) {//// m_utility is measured from network
                 reward = -2;
                 
-            } else
-            {
+            } else {
                 reward = 2;
-                
             }
             
             ai.learn(last_st, lastAction, reward, st, stateActionPair_timeOrder);
-            
         }
 
-    
         last_st = st;
     
         //// lastAction is the learned action that changes the congestion window in the network
         if (firstTime)
             lastAction = 2;
         else {
-            
             lastAction = ai.chooseAction(last_st, output_file, newfile);
-            
         }
     
         firstTime = false;
-    
 }
-
-    
     
 void TcpLearning::GetRttRatio(const TcpHeader& tcpHeader) {
+
     //// get m_rtt_ratio from network environment
     }
-    
-
 
 void TcpLearning::GetAckEwma() {
+
     //// get m_ack_ewma from network environment
     }
 
-
-
 void TcpLearning::GetSendEwma(const TcpHeader& tcpHeader){
+
     //// get m_send_ewma from network environment
     }
-
-
-
-
-
-
 
 TcpLearning::QLearning::QLearning() :
 		action(2),
@@ -231,16 +204,12 @@ TcpLearning::QLearning::QLearning() :
         alpha(0.9),
         gam(0.9),
         isFuzzy(true) {
-
 }
 
+void TcpLearning::QLearning::setFeatures(vector<Feature> allFeatures){
 
-
-void TcpLearning::QLearning::setFeatures(vector<Feature> allFeatures)
-{
 	features = allFeatures;
 }
-
 
 void TcpLearning::QLearning::computeFeatureWidth()
 {
@@ -299,19 +268,14 @@ double TcpLearning::QLearning::getQ_fuzzy(std::vector<double> state, int action)
 
 	}
 	return thetaSum;
-
 }
 
 int TcpLearning::QLearning::getTotalSize() {
-	return q.size();
 
+	return q.size();
 }
 
-
-
-
-void TcpLearning::QLearning::learn(std::vector<double> state1, int action1,
-                                   double reward, std::vector<double> state2, std::ofstream &sa_file) {
+void TcpLearning::QLearning::learn(std::vector<double> state1, int action1, double reward, std::vector<double> state2, std::ofstream &sa_file) {
     //// state2 is current state, state1 is previous state
     double maxQ = -999999999999999999;
     double maxQ_copy = maxQ;
@@ -332,10 +296,7 @@ void TcpLearning::QLearning::learn(std::vector<double> state1, int action1,
         learnQ(state1, action1, reward, reward + gam * maxQ, sa_file);
 }
 
-
-
-void TcpLearning::QLearning::learnQ(std::vector<double> state, int action,
-		double reward, double value, std::ofstream &stateActionPair_timeOrder) {
+void TcpLearning::QLearning::learnQ(std::vector<double> state, int action,	double reward, double value, std::ofstream &stateActionPair_timeOrder) {
 	std::vector<double> sa(state);
 	sa.push_back((double) action); //// sa is the state-action pair
 	std::map<std::vector<double>, double>::iterator it;
@@ -352,8 +313,7 @@ void TcpLearning::QLearning::learnQ(std::vector<double> state, int action,
 	}
 }
 
-void TcpLearning::QLearning::learnQ_fuzzy(std::vector<double> state, int action,
-		double reward, double value) {
+void TcpLearning::QLearning::learnQ_fuzzy(std::vector<double> state, int action, double reward, double value) {
 	double membershipGrade;
 	int tmpFeatureDiff;
 	double preQ = getQ_fuzzy(state, action);
@@ -366,11 +326,9 @@ void TcpLearning::QLearning::learnQ_fuzzy(std::vector<double> state, int action,
 		membershipGrade = (float) exp(-(tmpFeatureDiff * tmpFeatureDiff) / (2 * features[ff].getFeatureWidth()));
 		features[ff].setTheta(features[ff].getTheta() + alpha * delta * membershipGrade / (double) (NumFeatures) );
 	}
-
 }
 
-int TcpLearning::QLearning::chooseAction(std::vector<double> state,
-		std::ofstream &of, std::ofstream &newfile) {
+int TcpLearning::QLearning::chooseAction(std::vector<double> state, std::ofstream &of, std::ofstream &newfile) {
 	int action;
 	if ((double) rand() / RAND_MAX < epsilon) {
 		action = rand() % NumActions;
@@ -379,11 +337,9 @@ int TcpLearning::QLearning::chooseAction(std::vector<double> state,
 		action = chooseBestAction(state, of, newfile);
 		return action;
 	}
-
 }
 
-int TcpLearning::QLearning::chooseBestAction(std::vector<double> state,
-		std::ofstream &of, std::ofstream &newfile) {
+int TcpLearning::QLearning::chooseBestAction(std::vector<double> state, std::ofstream &of, std::ofstream &newfile) {
 	int action = 0;
 	double maxQ = -999999999999999999;
 	double maxQ_copy = maxQ;
@@ -424,9 +380,6 @@ int TcpLearning::QLearning::chooseBestAction(std::vector<double> state,
 
 	return action;
 }
-
-
-
 
 void TcpLearning::QLearning::printFeatures(std::ofstream &file){
 	for (int ft = 0; ft < NumFeatures; ft++) {
