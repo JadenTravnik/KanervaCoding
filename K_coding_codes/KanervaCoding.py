@@ -1,15 +1,16 @@
 from prototype import Prototype
 from math import exp
 import numpy as np
+import matplotlib.pyplot as plt
 
-gamma = 0.999
-epsilon = .2
+gamma = 0
+epsilon = 0
 alpha = .1
 
 AlphaFactor = 0.99995
 EpsilonFactor = 0.9995
 
-numPrototypes = 30
+numPrototypes = 10
 numActions = 1
 stateDimension = 1
 prototypes = []
@@ -17,17 +18,19 @@ prototypes = []
 # computes the prototype width which is the variance of distance between all other prototypes
 def computePrototypeWidth():
 	featureDiff = []
+
 	for i in range(numPrototypes):
 		total, mean, variance = 0,0,0
 		for j in range(numPrototypes):
-			if j != k:
-				featureDiff[idx] = prototypes[i].calculateDiff(prototypes[j])
+			if i != j:
+				featureDiff.append(prototypes[i].calculateDiff(prototypes[j]))
 
 		mean = sum(featureDiff)/(numPrototypes - 1)
 		total = sum([pow(diff - mean,2) for diff in featureDiff])
 
-		variance = total/ (numPrototpyes - 1 - 1) ## is this actually how this is calculated
-		prototype[i].setFeatureWidth(variance)
+		variance = total/ float(numPrototypes - 1) ## is this actually how this is calculated
+		prototypes[i].setFeatureWidth(variance)
+
 
 # generates k different prototypes based on the isDifferent metric
 def generatePrototypes(numPrototypes):
@@ -63,6 +66,7 @@ def learn(state1, action1, reward, state2):
 
 	preQ = getQ(state1, action1)
 	delta = reward + gamma*maxQ - preQ
+	print('state1: ' + str(state1) + ' state2: ' + str(state2) +  '  preQ: ' + str(preQ) + '  reward: ' + str(reward) + ' maxQ: ' + str(maxQ) + '  delta: ' + str(delta))
 
 	tempPrototype = Prototype(state1, action1)
 
@@ -75,7 +79,7 @@ def chooseAction(state):
 	if random.random() > epsilon:
 		return random.randrange(0,numActions)
 	else:
-		return chooseBestAction(state) 
+		return chooseBestAction(state)
 
 def chooseBestAction(state):
 	action = 0
@@ -105,30 +109,31 @@ def chooseBestAction(state):
 	return action
 
 
-generatePrototypes(numPrototypes)
-
-print(prototypes)
 
 
-numEpisodes = 50
+numEpisodes = 100
 numRuns = 1
 maxState = 5
 runValue = [[[0 for i in range(maxState)] for i in range(numEpisodes)] for i in range(numRuns)]
 
 for run in range(numRuns):
-	print('Run: ' + str(run) + '. New prototypes generated')
 	prototypes = []
 	generatePrototypes(numPrototypes)
+	computePrototypeWidth()
+	print([p.getState() for p in prototypes])
 
 	for episode in range(numEpisodes):
 		lastState = 0
-		print('Episode: ' + str(episode))
-		while lastState < maxState:
-			print('State: ' + str(lastState))
+		nextState = 0
+		while lastState < maxState-1:
 			nextState = lastState + 1 # simple state transition
 			learn(lastState, 0, 1, nextState) # the reward is +1 on the next state, only one action ("go forward")
-			runValue[run][episode][lastState] = getQ(lastState,0)
 			lastState = nextState
 
+		for i in range(maxState):
+			runValue[run][episode][i] = getQ(i,0)
 
-		print(runValue)
+
+
+
+print(runValue[0][numEpisodes-1])

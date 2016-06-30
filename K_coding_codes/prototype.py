@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 import random
 
 
@@ -18,7 +18,7 @@ class Prototype:
 
 	# feature
 	def copy(self, feature2):
-		self.setFixed(feature2.getState(), feature2.getAction)
+		self.setFixed(feature2.getState(), feature2.getAction())
 
 	# void
 	def setRandomly(self):
@@ -42,14 +42,14 @@ class Prototype:
 	# bool, other prototype
 	def isNeighbor(self, feature2):
 		return self.calculateDiff(feature2) <= self.adjacentcyThreshold
-			
+
 	# bool, other prototpye
 	def isDifferent(self, feature2):
 		return self.calculateDiff(feature2) > self.similarityThreshold
 
 	# unsigned int, feature
 	def calculateDiff(self, feature2):
-		
+
 		# diff = 0 #unsigned int
 		# actDif = 0 # unsigned int
 		# stateDif = 0 # unsigned int
@@ -92,11 +92,11 @@ class Prototype:
 	def setAction(self, a):
 		self.action = a
 
-	# vector<double> 
+	# vector<double>
 	def getState(self):
 		return self.state
 
-	# int 
+	# int
 	def getAction(self):
 		return self.action
 
@@ -118,12 +118,8 @@ class Prototype:
 
 	# void, float
 	def setFeatureWidth(self, featureWidth):
-		self.featureWidth_value = featureWidth_value
+		self.featureWidth_value = featureWidth
 
 	# float
 	def getFeatureWidth(self):
 		return self.featureWidth_value
-
-
-
-
