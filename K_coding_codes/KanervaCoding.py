@@ -10,7 +10,7 @@ alpha = .1
 AlphaFactor = 0.99995
 EpsilonFactor = 0.9995
 
-numPrototypes = 10
+numPrototypes = 30
 numActions = 1
 stateDimension = 1
 prototypes = []
