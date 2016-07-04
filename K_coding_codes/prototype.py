@@ -8,7 +8,7 @@ class Prototype:
 		self.frequence_value = 0	# float
 		self.featureWidth_value = 0 # float
 		self.adjacentcyThreshold = .01
-		self.similarityThreshold = .01
+		self.similarityThreshold = .0001
 
 		self.action = 0
 		self.state = [0]*stateDimension
@@ -86,7 +86,7 @@ class Prototype:
 
 	# void, vector s
 	def setState(self, s):
-		self.s = s
+		self.state = s
 
 	# void, int a
 	def setAction(self, a):
