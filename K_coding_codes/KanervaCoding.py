@@ -11,7 +11,7 @@ alpha = .1
 AlphaFactor = 0.99995
 EpsilonFactor = 0.9995
 
-numPrototypes = 10
+numPrototypes = 1
 numActions = 1
 stateDimension = 1
 prototypes = []
@@ -56,7 +56,7 @@ def generatePrototypes():
 	else :
 		for i in range(numPrototypes):
 			p = Prototype(numActions, stateDimension)
-			p.setFixed([(i+1)/float(numPrototypes+1) ], 0)
+			p.setFixed([i/float(numPrototypes+1) ], 0)
 			prototypes.append(p)
 
 			
@@ -164,19 +164,21 @@ def chooseBestAction(state):
 	return action
 
 
-numEpisodes = 300
-numRuns = 1
-maxState = 10
-runValue = [[[[0  for i in range(maxState)] for j in range(maxState)] for k in range(numEpisodes)] for l in range(numRuns)]
-distributionValue = [[[[0 for i in range(numPrototypes)] for j in range(maxState)] for k in range(numEpisodes)] for l in range(numRuns)]
+numEpisodes = 100
+numRuns = 5
+maxState = 50
+runValue = [[[0  for i in range(maxState)] for j in range(maxState)] for k in range(numEpisodes)]
+distributionValue = [[[0 for i in range(numRuns * 5 + 5)] for j in range(maxState)] for k in range(numEpisodes)]
 
 
 for run in range(numRuns):
 	prototypes = []
+	numPrototypes = run*5 + 5
 	generatePrototypes()
 	computePrototypeWidth()
 
 	for episode in range(numEpisodes):
+		print('Run ' + str(run) + ' episode ' + str(episode) + ' numPrototypes ' + str(numPrototypes))
 		lastState = 0
 		nextState = 0
 		while lastState < maxState-1:
@@ -188,24 +190,34 @@ for run in range(numRuns):
 			for i in range(maxState):
 				qi = getQ(i,0)
 				q.append(qi)
-				runValue[run][episode][lastState][i] = qi
+				runValue[episode][lastState][i] = qi
 
 			for j in range(numPrototypes):
-				distributionValue[run][episode][lastState][j] = getPrototypeDistribution(j)
+				distributionValue[episode][lastState][j] = getPrototypeDistribution(j)
+	
 
 
+	runValue = np.array(runValue)
+	distributionValue = [np.array([np.array(di) for di in d]) for d in distributionValue]
+
+	np.save('runValue-' + str(run) + '.npy', runValue)
+	np.save('distributionValue-' + str(run) + '.npy', distributionValue)
 
 raw_input("Press Enter to graph")
 
 x = np.linspace(0,maxState,maxState)
-y = x
+
+y = [maxState - i + 1 for i in range(maxState)]
+
 plt.ion()
 fig = plt.figure()
 
 ax = fig.add_subplot(111)
-plt.ylim([-3,maxState+3])
-plt.xlim([0,maxState])
-line1, = ax.plot(x,y, 'r-')
+plt.ylim([-3,maxState+5])
+plt.xlim([-1,maxState+1])
+line0, = ax.plot(x,y, linewidth=5, linestyle='-', c='purple')
+line1, = ax.plot(x,y, linewidth=5, linestyle='-', c='red')
+
 distributions = []
 for p in range(numPrototypes):
 	tempLine, = ax.plot(x,y,label=str(p))
@@ -214,7 +226,7 @@ for p in range(numPrototypes):
 #plt.legend(loc='best')
 
 for i in range(numEpisodes):
-	for j in range(maxState):
+	for j in range(maxState): # maxstate
 		line1.set_ydata(np.array(runValue[run][i][j]))
 		for k in range(numPrototypes):
 			distributions[k].set_ydata(np.array(distributionValue[run][i][j][k]))
