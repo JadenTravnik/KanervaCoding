@@ -1,15 +1,8 @@
 from prototype import Prototype
-from math import exp
+from math import exp, sqrt
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 
-gamma = 1
-epsilon = 0
-alpha = .1
-
-AlphaFactor = 0.99995
-EpsilonFactor = 0.9995
 
 numPrototypes = 1
 numActions = 1
@@ -91,6 +84,11 @@ def getPrototypeDistribution(i):
 		dist.append(membershipGrade*prototype.getTheta())
 	return dist
 
+
+def getTileQ(state,action):
+
+
+
 # updates the theta values of the prototypes
 def learn(state1, action1, reward, state2):
 	# maxQ = -float('inf')
@@ -104,81 +102,39 @@ def learn(state1, action1, reward, state2):
 	maxQ = getQ(state2, 0)
 
 	preQ = getQ(state1, action1)
-	# print('state1: ' + str(state1) + '  preq: ' + str(preQ) + ' state2: ' + str(state2))
-	# raw_input("Press Enter to continue...")
 
 	delta = reward + gamma*maxQ - preQ
-	# print('state1: ' + str(state1) + ' state2: ' + str(state2) +  '  preQ: ' + str(preQ) + '  reward: ' + str(reward) + ' maxQ: ' + str(maxQ) + '  delta: ' + str(delta))
 
 	tempPrototype = Prototype(numActions, stateDimension)
 	tempPrototype.setFixed([state1/float(maxState)], action1)
-	# print('state1: ' + str(state1) + '  tempPrototype.state: ' + str(tempPrototype.state))
-
-	# print([p.getTheta() for p in prototypes])
 
 	for prototype in prototypes:
 		tempFeatureDiff = tempPrototype.calculateDiff(prototype)
-		# print('Prototype: ' + str(prototype.state) + ' tempPrototype: ' + str(tempPrototype.state) + '  tempFeatureDiff: ' + str(tempFeatureDiff) + ' FeatureWidth: ' + str(prototype.getFeatureWidth()))
 
 		membershipGrade = float(exp(-(tempFeatureDiff*tempFeatureDiff)/2*prototype.getFeatureWidth()))
-		# print('membershipGrade: ' + str(membershipGrade) + ' theta: ' + str(prototype.getTheta()) + ' delta: ' + str(delta) + ' update: ' + str(prototype.getTheta() + alpha * delta * membershipGrade/numPrototypes))
 		prototype.setTheta(prototype.getTheta() + alpha * delta * membershipGrade/numPrototypes)
 
-		# raw_input("Press Enter to continue...")
-
-	# print([p.getTheta() for p in prototypes])
-
-	# raw_input("Press Enter to continue...")
-
-def chooseAction(state):
-	if random.random() > epsilon:
-		return random.randrange(0,numActions)
-	else:
-		return chooseBestAction(state)
-
-def chooseBestAction(state):
-	action = 0
-	maxQ = -inf
-	q_list = []
-	bestActionList = []
-
-	for a in range(numActions):
-		qValue = getQ(state, a)
-		q_list.append(qValue)
-
-	for i in range(len(q_list)):
-		if (maxQ < q_list[i]):
-				maxQ = q_list[i]
-				bestActionList = [] # clear the best values
-
-		if maxQ == q_list:
-			bestActionList.append(i) # add the action to the best value array
 
 
-	if bestV.size() > 1: # if there is more than 1 best value
-			index = rand() % bestV.size() # choose randomly
-			action - bestActionList[index]
-	else:
-		action = bestActionList[0]
 
-	return action
+numEpisodes = 300
+numRuns = 2
+maxState = 10
+# runValue = [[[0  for i in range(maxState)] for j in range(maxState)] for k in range(numEpisodes)]
+# distributionValue = [[[0 for i in range(numRuns * 5 + 5)] for j in range(maxState)] for k in range(numEpisodes)]
+error = [0 for k in range(numEpisodes)]
 
+w = [0]*72 # 8 overlapping 9 cell tilings
 
-numEpisodes = 100
-numRuns = 5
-maxState = 50
-runValue = [[[0  for i in range(maxState)] for j in range(maxState)] for k in range(numEpisodes)]
-distributionValue = [[[0 for i in range(numRuns * 5 + 5)] for j in range(maxState)] for k in range(numEpisodes)]
-
-
-for run in range(numRuns):
+for run in range(1,numRuns):
 	prototypes = []
 	numPrototypes = run*5 + 5
 	generatePrototypes()
 	computePrototypeWidth()
 
 	for episode in range(numEpisodes):
-		print('Run ' + str(run) + ' episode ' + str(episode) + ' numPrototypes ' + str(numPrototypes))
+		if episode % 1000 == 0:
+			print('episode ' + str(episode))
 		lastState = 0
 		nextState = 0
 		while lastState < maxState-1:
@@ -186,48 +142,25 @@ for run in range(numRuns):
 			learn(lastState, 0, 1, nextState) # the reward is +1 on the next state, only one action ("go forward")
 			lastState = nextState
 
-			q = []
-			for i in range(maxState):
-				qi = getQ(i,0)
-				q.append(qi)
-				runValue[episode][lastState][i] = qi
+			# q = []
+			# for i in range(maxState):
+			# 	qi = getQ(i,0)
+			# 	q.append(qi)
+			# 	runValue[episode][lastState][i] = qi
 
-			for j in range(numPrototypes):
-				distributionValue[episode][lastState][j] = getPrototypeDistribution(j)
-	
+			# for j in range(numPrototypes):
+			# 	distributionValue[episode][lastState][j] = getPrototypeDistribution(j)
+
+		for i in range(maxState):
+
+			error[episode] += sqrt(pow((maxState - i) - getQ(i,0),2))
+
+	# runValue = np.array(runValue)
+	# distributionValue = [np.array([np.array(di) for di in d]) for d in distributionValue]
+
+	# np.save('runValue-' + str(run*5 + 5) + '.npy', runValue)
+	# np.save('distributionValue-' + str(run*5 + 5) + '.npy', distributionValue)
 
 
-	runValue = np.array(runValue)
-	distributionValue = [np.array([np.array(di) for di in d]) for d in distributionValue]
-
-	np.save('runValue-' + str(run) + '.npy', runValue)
-	np.save('distributionValue-' + str(run) + '.npy', distributionValue)
-
-raw_input("Press Enter to graph")
-
-x = np.linspace(0,maxState,maxState)
-
-y = [maxState - i + 1 for i in range(maxState)]
-
-plt.ion()
-fig = plt.figure()
-
-ax = fig.add_subplot(111)
-plt.ylim([-3,maxState+5])
-plt.xlim([-1,maxState+1])
-line0, = ax.plot(x,y, linewidth=5, linestyle='-', c='purple')
-line1, = ax.plot(x,y, linewidth=5, linestyle='-', c='red')
-
-distributions = []
-for p in range(numPrototypes):
-	tempLine, = ax.plot(x,y,label=str(p))
-	distributions.append(tempLine)
-
-#plt.legend(loc='best')
-
-for i in range(numEpisodes):
-	for j in range(maxState): # maxstate
-		line1.set_ydata(np.array(runValue[run][i][j]))
-		for k in range(numPrototypes):
-			distributions[k].set_ydata(np.array(distributionValue[run][i][j][k]))
-		fig.canvas.draw()
+plt.plot(error)
+plt.show()
