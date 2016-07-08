@@ -46,7 +46,7 @@ class KanervaCoding1D:
 
 		for prototype in self.prototypes:
 			tempFeatureDiff = tempPrototype.calculateDiff(prototype)
-			membershipGrade = float(exp(-(tempFeatureDiff*tempFeatureDiff)/(2*prototype.getFeatureWidth())))/sqrt(2*prototype.getFeatureWidth()*pi)
+			membershipGrade = float(exp(-(tempFeatureDiff*tempFeatureDiff)/(2*prototype.getFeatureWidth())))#/sqrt(2*prototype.getFeatureWidth()*pi)
 			thetaSum += prototype.getTheta() * membershipGrade
 
 		return thetaSum
@@ -68,8 +68,8 @@ class KanervaCoding1D:
 
 				variance = total/ float(self.numPrototypes - 1) ## is this actually how this is calculated
 
-				#prototypes[i].setFeatureWidth(variance)
-				self.prototypes[i].setFeatureWidth(variance)
+				#self.prototypes[i].setFeatureWidth(1)
+				self.prototypes[i].setFeatureWidth(.1)
 		else:
 			self.prototypes[0].setFeatureWidth(100)
 
@@ -83,5 +83,5 @@ class KanervaCoding1D:
 		for prototype in self.prototypes:
 			tempFeatureDiff = tempPrototype.calculateDiff(prototype)
 
-			membershipGrade = float(exp(-(tempFeatureDiff*tempFeatureDiff)/2*prototype.getFeatureWidth()))
-			prototype.setTheta(prototype.getTheta() + alpha * delta * membershipGrade/self.numPrototypes)
+			membershipGrade = float(exp(-(tempFeatureDiff*tempFeatureDiff)/2*prototype.getFeatureWidth()))#/sqrt(2*prototype.getFeatureWidth()*pi)
+			prototype.setTheta(prototype.getTheta() + alpha * delta * membershipGrade)

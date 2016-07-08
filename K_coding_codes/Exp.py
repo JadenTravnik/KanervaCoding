@@ -2,18 +2,15 @@ from math import exp, sqrt
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-
 from KC import KanervaCoding1D
 from Tilecoder import TileCoder1D
-
 
 gamma = 1
 epsilon = 0
 alpha = .1
-
 stateDimension = 1
 
-numEpisodes = 30000
+numEpisodes = 20000
 numRuns = 1
 maxState = 10
 # runValue = [[[0  for i in range(maxState)] for j in range(maxState)] for k in range(numEpisodes)]
@@ -22,7 +19,7 @@ errorTC = [0 for i in range(numEpisodes)]
 errorKC = [0 for i in range(numEpisodes)]
 
 tc = TileCoder1D(3, 8, maxState)
-kc = KanervaCoding1D(20, maxState)
+kc = KanervaCoding1D(11, maxState)
 
 def learn(state1, reward, state2):
 
