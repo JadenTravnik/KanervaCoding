@@ -1,10 +1,17 @@
 import numpy as np
 import random
+import struct
+from math import sqrt
+
+
+def binary(num):
+    return int(''.join(bin(ord(c)).replace('0b', '').rjust(8, '0') for c in struct.pack('!f', num)),2)
 
 
 class Prototype:
-	def __init__(self, numActions=0, stateDimension=0, randomInit=True):
+	def __init__(self, numActions=0, stateDimension=0, group=0, randomInit=True):
 		self.theta_value = 0 # theta value associated with each prototype (feature) # float
+		self.group = group
 		self.frequence_value = 0	# float
 		self.featureWidth_value = 0 # float
 		self.adjacentcyThreshold = .01
@@ -55,12 +62,21 @@ class Prototype:
 		# stateDif = 0 # unsigned int
 		# state_4_Dif = 0 # unsigned int
 
-		if self.action == feature2.getAction():
-			actDif = 0
-		else:
-			actDif = 1
+		# if self.action == feature2.getAction():
+		# 	actDif = 0
+		# else:
+		# 	actDif = 1
 
-		difference = sum([abs(self.state[i] - feature2.state[i]) for i in range(len(self.state))]) + actDif
+		difference = sum([sqrt((self.state[i] - feature2.state[i])**2) for i in range(len(self.state))]) # + actDif
+
+
+		# difference = 0
+		# for j in range(len(self.state)):
+		# 	z = binary(self.state[j]) & binary(feature2.state[j])
+		# 	while z:
+		# 		difference += 1
+		# 		z &= z-1 # magic!
+		# return difference		
 
 		# for i in xrange(0,3):
 		# 	if (self.state[i] != feature2.getState()[i])
