@@ -17,7 +17,6 @@ class Prototype:
 		self.adjacentcyThreshold = .01
 		self.similarityThreshold = .0001
 
-		self.action = 0
 		self.state = [0]*stateDimension
 		self.numActions = numActions
 		if randomInit:
@@ -44,7 +43,7 @@ class Prototype:
 
 	#void
 	def printPrototpye(self):
-		print(str(self.state) + ', ' + str(self.action))
+		print(str(self.state) + ', ' + str(self.featureWidth_value) + ', ' + str(self.theta_value))
 
 	# bool, other prototype
 	def isNeighbor(self, feature2):
@@ -67,16 +66,16 @@ class Prototype:
 		# else:
 		# 	actDif = 1
 
-		difference = sum([sqrt((self.state[i] - feature2.state[i])**2) for i in range(len(self.state))]) # + actDif
+		# difference = sum([sqrt((self.state[i] - feature2.state[i])**2) for i in range(len(self.state))]) # + actDif
 
 
-		# difference = 0
-		# for j in range(len(self.state)):
-		# 	z = binary(self.state[j]) & binary(feature2.state[j])
-		# 	while z:
-		# 		difference += 1
-		# 		z &= z-1 # magic!
-		# return difference		
+		difference = 0
+		for j in range(len(self.state)):
+			z = binary(self.state[j]) & binary(feature2.state[j])
+			while z:
+				difference += 1
+				z &= z-1 # magic!
+		return difference		
 
 		# for i in xrange(0,3):
 		# 	if (self.state[i] != feature2.getState()[i])
