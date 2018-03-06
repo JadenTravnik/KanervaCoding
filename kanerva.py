@@ -6,6 +6,27 @@ import struct
 
 # It is recommended that one read the README before using this class
 
+class SelectiveKanervaCoder:
+
+	def __init__(self, _numPrototypes, _dimensions = 2, _eta = .025, _seed = 0):
+
+		self.numPrototypes = _numPrototypes
+		self.dimensions = _dimensions
+		self.eta = _eta
+		self.c = int(_numPrototypes*_eta)
+		self.seed = _seed if _seed != 0 else np.random.random()
+		np.random.seed(_seed)
+		self.prototypes = np.random.rand(_numPrototypes, _dimensions)
+
+	def getFeatures(self, _input):
+		D = self.prototypes - _input
+		D = np.sqrt(sum(D.T**2)) # get Euclidian distance
+		indexes = np.argpartition(D, self.c, axis=0)[:self.c]
+		phi = np.zeros(self.numPrototypes)
+		phi[indexes] = 1
+		return phi
+
+
 class KanervaCoder:
 	distanceMeasure = 'euclidian' # alternatively hamming distance could be used
 	numPrototypes = 50
