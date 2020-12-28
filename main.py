@@ -52,6 +52,8 @@ def main():
 
     axarr[0].plot(log['td_error'], color='r')
     axarr[0].title.set_text('TD Error')
+    axarr[0].set_xlabel('Episodes')
+    axarr[0].set_ylabel('TD Error')
 
     axarr[1].scatter(rep.prototypes[:, 0], rep.prototypes[:, 1], c=rep.visit_counts)
     axarr[1].title.set_text('Prototype Visit Count')
