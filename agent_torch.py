@@ -1,5 +1,3 @@
-from typing import NoReturn
-
 import torch
 from torch import nn
 
@@ -16,14 +14,14 @@ class QValueAgentTorch(nn.Module):
         device: torch.device | None = None,
     ):
         """
-        Simple Q Learning Agent with elegability traces implemented in PyTorch.
+        Simple Q Learning Agent with eligibility traces implemented in PyTorch.
 
         :param n_features: number of features that represent the space
         :param n_actions: number of discrete actions
         :param alpha: learning rate
         :param epsilon: epsilon greedy policy
         :param gamma: discount factor
-        :param lmbda: elegibility trace factor
+        :param lmbda: eligibility trace factor
         :param device: device to run the model on
         """
         super().__init__()
@@ -89,7 +87,7 @@ class QValueAgentTorch(nn.Module):
 
     def update(self, state: torch.Tensor, action: int, reward: float, next_state: torch.Tensor) -> float:
         """
-        Updates the agent using the qlearning with elegabilty traces update
+        Updates the agent using the qlearning with eligibility traces update
 
         :param state: indices of active features for the state
         :param action: action index
@@ -108,7 +106,7 @@ class QValueAgentTorch(nn.Module):
             # calculate td_error based on current value
             td_err = reward + v_next - float(self.w[state, action].sum().item())
 
-            # the len(state) is ensure that the total update is distributed over the feature weights
+        # the len(state) is to ensure that the total update is distributed over the feature weights
             alpha = self.alpha / len(state)
 
             # update weights
@@ -116,19 +114,19 @@ class QValueAgentTorch(nn.Module):
 
         return td_err
 
-    def erase_traces(self) -> NoReturn:
+    def erase_traces(self) -> None:
         """
         Erases the traces
         """
         self.e *= 0
 
-    def save(self, filename: str) -> NoReturn:
+    def save(self, filename: str) -> None:
         """
         Saves the weights of the agent to a torch file
         """
         torch.save(self.state_dict(), filename)
 
-    def load(self, filename: str) -> NoReturn:
+    def load(self, filename: str) -> None:
         """
         Loads the weights of the agent stored in a torch file
         """

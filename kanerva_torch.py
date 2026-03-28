@@ -34,7 +34,7 @@ class KanervaLayer(nn.Module):
         """
         Normalizes the data to be between 0,1
 
-        :param data: data to normalize
+        :param data: data to normalize (expected within observation space bounds)
         :return: normalized data
         """
         return (data - self.obs_low) / self.obs_range
@@ -42,7 +42,7 @@ class KanervaLayer(nn.Module):
     def distance(self, data: torch.Tensor) -> torch.Tensor:
         """
         Computes the distance between the data and the prototypes.
-        Defaults to euclidian distance
+        Defaults to euclidean distance
 
         :param data: normalized input batch
         :return: distance tensor for each prototype

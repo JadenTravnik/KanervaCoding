@@ -86,7 +86,7 @@ def check_agent_parity() -> None:
     if abs(np_td_err - torch_td_err) > 1e-6:
         raise AssertionError(f"td error mismatch: numpy={np_td_err}, torch={torch_td_err}")
 
-    _assert_close("weights", np_agent.w, torch_agent.w.detach().cpu().numpy(), eps=1e-5)
+    _assert_close("weights", np_agent.w, torch_agent.w.detach().cpu().numpy(), eps=1e-6)
     _assert_close("eligibility traces", np_agent.e, torch_agent.e.detach().cpu().numpy(), eps=1e-6)
 
 
