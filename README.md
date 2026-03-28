@@ -10,4 +10,4 @@ Running main.py will train a Q learning agent with elegability traces on Mountai
 - numpy
 - matplotlib
 - gym
-
+- optuna (optional, for hyperparameter tuning in compare_learning_curves.py)
