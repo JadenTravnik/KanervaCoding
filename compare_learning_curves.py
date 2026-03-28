@@ -10,6 +10,8 @@ from agent_torch import QValueAgentTorch, QValueAgentTorchBinary
 from kanerva import BaseKanervaCoder
 from kanerva_torch import KanervaBinary, KanervaLayer
 
+NEAR_INF_MULTIPLIER = 0.5
+
 # gym==0.26 expects np.bool8, which is removed in NumPy 2.x.
 if not hasattr(np, "bool8"):
     np.bool8 = np.bool_
@@ -32,7 +34,24 @@ def _step_env(env: gym.Env, action: int):
     return obs, reward, done, info
 
 
+def _kanerva_observation_space(env: gym.Env, non_finite_bound: float) -> gym.spaces.Box:
+    observation_space = env.observation_space
+    if not isinstance(observation_space, gym.spaces.Box):
+        raise ValueError("Kanerva comparisons require a Box observation space")
+
+    low = np.asarray(observation_space.low, dtype=np.float32)
+    high = np.asarray(observation_space.high, dtype=np.float32)
+
+    # Some envs use extreme finite sentinels (e.g., +/-3.4e38) instead of true inf.
+    # Treat values above this threshold as effectively unbounded for stable normalization.
+    near_inf_threshold = np.finfo(np.float32).max * NEAR_INF_MULTIPLIER
+    low = np.where(np.isfinite(low) & (np.abs(low) < near_inf_threshold), low, -non_finite_bound)
+    high = np.where(np.isfinite(high) & (np.abs(high) < near_inf_threshold), high, non_finite_bound)
+    return gym.spaces.Box(low=low, high=high, dtype=np.float32)
+
+
 def train_numpy_agent(
+    env_id: str,
     n_episodes: int,
     max_steps: int,
     n_features: int,
@@ -42,11 +61,13 @@ def train_numpy_agent(
     gamma: float,
     lmbda: float,
     seed: int,
+    non_finite_bound: float,
 ) -> np.ndarray:
-    env = gym.make("MountainCar-v0")
+    env = gym.make(env_id)
     env.action_space.seed(seed)
 
-    rep = BaseKanervaCoder(env.observation_space, n_features, n_closest)
+    rep_space = _kanerva_observation_space(env, non_finite_bound)
+    rep = BaseKanervaCoder(rep_space, n_features, n_closest)
     agent = QValueAgent(n_features, env.action_space.n, alpha=alpha, epsilon=epsilon, gamma=gamma, lmbda=lmbda)
 
     returns = np.zeros(n_episodes, dtype=np.float32)
@@ -75,6 +96,7 @@ def train_numpy_agent(
 
 
 def train_torch_agent(
+    env_id: str,
     n_episodes: int,
     max_steps: int,
     n_features: int,
@@ -84,11 +106,13 @@ def train_torch_agent(
     gamma: float,
     lmbda: float,
     seed: int,
+    non_finite_bound: float,
 ) -> np.ndarray:
-    env = gym.make("MountainCar-v0")
+    env = gym.make(env_id)
     env.action_space.seed(seed)
 
-    rep = KanervaLayer(env.observation_space, n_features, n_closest)
+    rep_space = _kanerva_observation_space(env, non_finite_bound)
+    rep = KanervaLayer(rep_space, n_features, n_closest)
     agent = QValueAgentTorch(n_features, env.action_space.n, alpha=alpha, epsilon=epsilon, gamma=gamma, lmbda=lmbda)
 
     returns = np.zeros(n_episodes, dtype=np.float32)
@@ -119,6 +143,7 @@ def train_torch_agent(
 
 
 def train_torch_binary_agent(
+    env_id: str,
     n_episodes: int,
     max_steps: int,
     n_features: int,
@@ -130,11 +155,13 @@ def train_torch_binary_agent(
     gamma: float,
     lmbda: float,
     seed: int,
+    non_finite_bound: float,
 ) -> np.ndarray:
-    env = gym.make("MountainCar-v0")
+    env = gym.make(env_id)
     env.action_space.seed(seed)
 
-    kanerva_layer = KanervaLayer(env.observation_space, n_features, n_closest)
+    rep_space = _kanerva_observation_space(env, non_finite_bound)
+    kanerva_layer = KanervaLayer(rep_space, n_features, n_closest)
     kanerva_binary_layer = KanervaBinary(n_features, n_binary_features, n_binary_closest)
     agent = QValueAgentTorchBinary(
         kanerva_layer=kanerva_layer,
@@ -187,6 +214,7 @@ def moving_average(values: np.ndarray, window: int) -> np.ndarray:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare NumPy and PyTorch Kanerva agent learning curves")
+    parser.add_argument("--env-id", type=str, default="MountainCar-v0")
     parser.add_argument("--episodes", type=int, default=200)
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument("--n-features", type=int, default=2000)
@@ -200,12 +228,19 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--smooth-window", type=int, default=10)
     parser.add_argument("--output", type=str, default="learning_curve_comparison.png")
+    parser.add_argument(
+        "--non-finite-bound",
+        type=float,
+        default=5.0,
+        help="Finite bound to replace infinite/near-infinite observation limits for Kanerva normalization",
+    )
     args = parser.parse_args()
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
     numpy_returns = train_numpy_agent(
+        env_id=args.env_id,
         n_episodes=args.episodes,
         max_steps=args.max_steps,
         n_features=args.n_features,
@@ -215,12 +250,14 @@ def main() -> None:
         gamma=args.gamma,
         lmbda=args.lmbda,
         seed=args.seed,
+        non_finite_bound=args.non_finite_bound,
     )
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
     torch_returns = train_torch_agent(
+        env_id=args.env_id,
         n_episodes=args.episodes,
         max_steps=args.max_steps,
         n_features=args.n_features,
@@ -230,12 +267,14 @@ def main() -> None:
         gamma=args.gamma,
         lmbda=args.lmbda,
         seed=args.seed,
+        non_finite_bound=args.non_finite_bound,
     )
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
     torch_binary_returns = train_torch_binary_agent(
+        env_id=args.env_id,
         n_episodes=args.episodes,
         max_steps=args.max_steps,
         n_features=args.n_features,
@@ -247,6 +286,7 @@ def main() -> None:
         gamma=args.gamma,
         lmbda=args.lmbda,
         seed=args.seed,
+        non_finite_bound=args.non_finite_bound,
     )
 
     episodes = np.arange(args.episodes)
@@ -267,7 +307,7 @@ def main() -> None:
         linewidth=2.0,
         label=f"PyTorch+Binary (MA {args.smooth_window})",
     )
-    plt.title("MountainCar-v0 Learning Curve: NumPy vs PyTorch vs PyTorch+Binary Agents")
+    plt.title(f"{args.env_id} Learning Curve: NumPy vs PyTorch vs PyTorch+Binary Agents")
     plt.xlabel("Episode")
     plt.ylabel("Episode Return")
     plt.grid(alpha=0.2)
