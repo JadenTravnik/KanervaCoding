@@ -1,4 +1,5 @@
 import argparse
+import time
 
 import gym
 import matplotlib.pyplot as plt
@@ -11,6 +12,15 @@ from kanerva import BaseKanervaCoder
 from kanerva_torch import KanervaBinary, KanervaLayer
 
 NEAR_INF_MULTIPLIER = 0.5
+EARLY_WEIGHT_START = 1.0
+EARLY_WEIGHT_END = 0.1
+TORCH_SEED_MULTIPLIER = 17
+TORCH_BINARY_SEED_MULTIPLIER = 23
+TUNER_BINARY_SAMPLER_SEED_OFFSET = 1009
+SEED_MODULUS = 2**31
+# Early episodes get larger weights so the tuning objective favors faster learning.
+# Later episodes still contribute, but with smaller weight.
+_EARLY_RETURN_WEIGHTS_CACHE: dict[int, np.ndarray] = {}
 
 # gym==0.26 expects np.bool8, which is removed in NumPy 2.x.
 if not hasattr(np, "bool8"):
@@ -212,6 +222,99 @@ def moving_average(values: np.ndarray, window: int) -> np.ndarray:
     return np.convolve(values, kernel, mode="same")
 
 
+def _early_weighted_return(returns: np.ndarray) -> float:
+    n_returns = len(returns)
+    if n_returns == 0:
+        return 0.0
+    weights = _EARLY_RETURN_WEIGHTS_CACHE.get(n_returns)
+    if weights is None:
+        weights = np.linspace(EARLY_WEIGHT_START, EARLY_WEIGHT_END, n_returns)
+        _EARLY_RETURN_WEIGHTS_CACHE[n_returns] = weights
+    return float(np.average(returns, weights=weights))
+
+
+def _tuning_objective_score(returns: np.ndarray, elapsed_seconds: float, speed_weight: float) -> float:
+    """
+    Objective units are reward points minus a speed penalty in seconds.
+    Maximizing this favors strong early learning while penalizing slower trials.
+    """
+    return _early_weighted_return(returns) - speed_weight * elapsed_seconds
+
+
+def _tune_pytorch_hyperparameters(args) -> tuple[dict, dict]:
+    try:
+        import optuna
+    except ImportError as exc:
+        raise ImportError("Optuna tuning requested, but optuna is not installed.") from exc
+
+    n_closest_high = min(100, args.n_features - 1)
+    n_binary_closest_high = min(100, args.n_binary_features - 1)
+
+    def objective_torch(trial):
+        n_closest = trial.suggest_int("n_closest", 5, n_closest_high)
+        alpha = trial.suggest_float("alpha", 1e-3, 3e-1, log=True)
+        epsilon = trial.suggest_float("epsilon", 0.01, 0.3)
+        gamma = trial.suggest_float("gamma", 0.90, 0.999)
+        lmbda = trial.suggest_float("lmbda", 0.80, 1.0)
+        seed = (args.seed + trial.number * TORCH_SEED_MULTIPLIER) % SEED_MODULUS
+
+        start = time.perf_counter()
+        returns = train_torch_agent(
+            env_id=args.env_id,
+            n_episodes=args.optuna_episodes,
+            max_steps=args.max_steps,
+            n_features=args.n_features,
+            n_closest=n_closest,
+            alpha=alpha,
+            epsilon=epsilon,
+            gamma=gamma,
+            lmbda=lmbda,
+            seed=seed,
+            non_finite_bound=args.non_finite_bound,
+        )
+        elapsed = time.perf_counter() - start
+        return _tuning_objective_score(returns, elapsed, args.speed_weight)
+
+    def objective_torch_binary(trial):
+        n_closest = trial.suggest_int("n_closest", 5, n_closest_high)
+        n_binary_closest = trial.suggest_int("n_binary_closest", 5, n_binary_closest_high)
+        alpha = trial.suggest_float("alpha", 1e-3, 3e-1, log=True)
+        epsilon = trial.suggest_float("epsilon", 0.01, 0.3)
+        gamma = trial.suggest_float("gamma", 0.90, 0.999)
+        lmbda = trial.suggest_float("lmbda", 0.80, 1.0)
+        seed = (args.seed + trial.number * TORCH_BINARY_SEED_MULTIPLIER) % SEED_MODULUS
+
+        start = time.perf_counter()
+        returns = train_torch_binary_agent(
+            env_id=args.env_id,
+            n_episodes=args.optuna_episodes,
+            max_steps=args.max_steps,
+            n_features=args.n_features,
+            n_closest=n_closest,
+            n_binary_features=args.n_binary_features,
+            n_binary_closest=n_binary_closest,
+            alpha=alpha,
+            epsilon=epsilon,
+            gamma=gamma,
+            lmbda=lmbda,
+            seed=seed,
+            non_finite_bound=args.non_finite_bound,
+        )
+        elapsed = time.perf_counter() - start
+        return _tuning_objective_score(returns, elapsed, args.speed_weight)
+
+    torch_sampler = optuna.samplers.TPESampler(seed=args.seed)
+    torch_binary_sampler = optuna.samplers.TPESampler(seed=args.seed + TUNER_BINARY_SAMPLER_SEED_OFFSET)
+
+    torch_study = optuna.create_study(direction="maximize", sampler=torch_sampler)
+    torch_study.optimize(objective_torch, n_trials=args.optuna_trials)
+
+    torch_binary_study = optuna.create_study(direction="maximize", sampler=torch_binary_sampler)
+    torch_binary_study.optimize(objective_torch_binary, n_trials=args.optuna_trials)
+
+    return torch_study.best_params, torch_binary_study.best_params
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare NumPy and PyTorch Kanerva agent learning curves")
     parser.add_argument("--env-id", type=str, default="MountainCar-v0")
@@ -228,6 +331,19 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--smooth-window", type=int, default=10)
     parser.add_argument("--output", type=str, default="learning_curve_comparison.png")
+    parser.add_argument("--optuna-trials", type=int, default=0)
+    parser.add_argument(
+        "--optuna-episodes",
+        type=int,
+        default=60,
+        help="Episode budget per Optuna trial (kept lower than full training for faster tuning)",
+    )
+    parser.add_argument(
+        "--speed-weight",
+        type=float,
+        default=1.0,
+        help="Penalty multiplier for elapsed seconds during Optuna tuning objective",
+    )
     parser.add_argument(
         "--non-finite-bound",
         type=float,
@@ -238,6 +354,32 @@ def main() -> None:
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+
+    torch_params = {
+        "n_closest": args.n_closest,
+        "alpha": args.alpha,
+        "epsilon": args.epsilon,
+        "gamma": args.gamma,
+        "lmbda": args.lmbda,
+    }
+    torch_binary_params = {
+        "n_closest": args.n_closest,
+        "n_binary_closest": args.n_binary_closest,
+        "alpha": args.alpha,
+        "epsilon": args.epsilon,
+        "gamma": args.gamma,
+        "lmbda": args.lmbda,
+    }
+
+    if args.optuna_trials > 0:
+        if args.optuna_episodes <= 0:
+            raise ValueError("--optuna-episodes must be > 0 when --optuna-trials is enabled")
+        torch_best_params, torch_binary_best_params = _tune_pytorch_hyperparameters(args)
+        torch_params.update(torch_best_params)
+        torch_binary_params.update(torch_binary_best_params)
+
+        print(f"Optuna best params (PyTorch): {torch_params}")
+        print(f"Optuna best params (PyTorch+Binary): {torch_binary_params}")
 
     numpy_returns = train_numpy_agent(
         env_id=args.env_id,
@@ -261,11 +403,11 @@ def main() -> None:
         n_episodes=args.episodes,
         max_steps=args.max_steps,
         n_features=args.n_features,
-        n_closest=args.n_closest,
-        alpha=args.alpha,
-        epsilon=args.epsilon,
-        gamma=args.gamma,
-        lmbda=args.lmbda,
+        n_closest=torch_params["n_closest"],
+        alpha=torch_params["alpha"],
+        epsilon=torch_params["epsilon"],
+        gamma=torch_params["gamma"],
+        lmbda=torch_params["lmbda"],
         seed=args.seed,
         non_finite_bound=args.non_finite_bound,
     )
@@ -278,13 +420,13 @@ def main() -> None:
         n_episodes=args.episodes,
         max_steps=args.max_steps,
         n_features=args.n_features,
-        n_closest=args.n_closest,
+        n_closest=torch_binary_params["n_closest"],
         n_binary_features=args.n_binary_features,
-        n_binary_closest=args.n_binary_closest,
-        alpha=args.alpha,
-        epsilon=args.epsilon,
-        gamma=args.gamma,
-        lmbda=args.lmbda,
+        n_binary_closest=torch_binary_params["n_binary_closest"],
+        alpha=torch_binary_params["alpha"],
+        epsilon=torch_binary_params["epsilon"],
+        gamma=torch_binary_params["gamma"],
+        lmbda=torch_binary_params["lmbda"],
         seed=args.seed,
         non_finite_bound=args.non_finite_bound,
     )
