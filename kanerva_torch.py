@@ -72,3 +72,59 @@ class KanervaLayer(nn.Module):
         )
         features.scatter_(1, indexes, 1.0)
         return features
+
+
+class KanervaBinary(nn.Module):
+    def __init__(self, n_input_features: int, n_prototypes: int, n_closest: int):
+        """
+        Binary Kanerva coding layer using Hamming distance and selective activation.
+
+        :param n_input_features: size of incoming binary feature vector
+        :param n_prototypes: number of binary prototypes to represent space
+        :param n_closest: number of active prototypes
+        """
+        super().__init__()
+        self.n_input_features = n_input_features
+        self.n_prototypes = n_prototypes
+        self.n_closest = n_closest
+
+        prototypes = torch.randint(
+            low=0,
+            high=2,
+            size=(n_prototypes, n_input_features),
+            dtype=torch.bool,
+        )
+        self.prototypes = nn.Parameter(prototypes, requires_grad=False)
+
+    def distance(self, data: torch.Tensor) -> torch.Tensor:
+        """
+        Computes Hamming distance between binary input features and binary prototypes.
+
+        :param data: binary input batch
+        :return: distance tensor for each prototype
+        """
+        bin_data = data > 0
+        diff = torch.logical_xor(self.prototypes.unsqueeze(0), bin_data.unsqueeze(1))
+        return diff.sum(dim=-1).float()
+
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
+        """
+        Gets active binary prototypes for the input binary features.
+
+        :param data: input tensor of shape (n_input_features,) or (batch, n_input_features)
+        :return: binary activation tensor of shape (batch, n_prototypes)
+        """
+        if data.dim() == 1:
+            data = data.unsqueeze(0)
+
+        dist = self.distance(data)
+        _, indexes = torch.topk(dist, k=self.n_closest, dim=1, largest=False)
+
+        features = torch.zeros(
+            data.shape[0],
+            self.n_prototypes,
+            device=data.device,
+            dtype=torch.float32,
+        )
+        features.scatter_(1, indexes, 1.0)
+        return features

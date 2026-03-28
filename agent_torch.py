@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from kanerva_torch import KanervaBinary, KanervaLayer
+
 
 class QValueAgentTorch(nn.Module):
     def __init__(
@@ -131,3 +133,68 @@ class QValueAgentTorch(nn.Module):
         Loads the weights of the agent stored in a torch file
         """
         self.load_state_dict(torch.load(filename, map_location=self.e.device))
+
+
+class QValueAgentTorchBinary(nn.Module):
+    def __init__(
+        self,
+        kanerva_layer: KanervaLayer,
+        kanerva_binary_layer: KanervaBinary,
+        n_actions: int,
+        alpha: float = 0.01,
+        epsilon: float = 0.1,
+        gamma: float = 0.9,
+        lmbda: float = 0.9,
+        device: torch.device | None = None,
+    ):
+        """
+        Q Learning Agent with eligibility traces composed with two Kanerva layers.
+
+        :param kanerva_layer: first-stage continuous Kanerva layer
+        :param kanerva_binary_layer: second-stage binary Kanerva layer
+        :param n_actions: number of discrete actions
+        :param alpha: learning rate
+        :param epsilon: epsilon greedy policy
+        :param gamma: discount factor
+        :param lmbda: eligibility trace factor
+        :param device: device to run the model on
+        """
+        super().__init__()
+        self.kanerva_layer = kanerva_layer
+        self.kanerva_binary_layer = kanerva_binary_layer
+
+        if device is None:
+            device = torch.device("cpu")
+
+        self.q_agent = QValueAgentTorch(
+            n_features=kanerva_binary_layer.n_prototypes,
+            n_actions=n_actions,
+            alpha=alpha,
+            epsilon=epsilon,
+            gamma=gamma,
+            lmbda=lmbda,
+            device=device,
+        )
+
+    def features_from_observation(self, observation: torch.Tensor) -> torch.Tensor:
+        first_features = self.kanerva_layer(observation).squeeze(0)
+        second_features = self.kanerva_binary_layer(first_features).squeeze(0)
+        return torch.nonzero(second_features, as_tuple=False).squeeze(-1)
+
+    def act(self, observation: torch.Tensor, greedy: bool = False) -> int:
+        features = self.features_from_observation(observation)
+        return self.q_agent.act(features, greedy=greedy)
+
+    def update(
+        self,
+        observation: torch.Tensor,
+        action: int,
+        reward: float,
+        next_observation: torch.Tensor,
+    ) -> float:
+        features = self.features_from_observation(observation)
+        next_features = self.features_from_observation(next_observation)
+        return self.q_agent.update(features, action, reward, next_features)
+
+    def erase_traces(self) -> None:
+        self.q_agent.erase_traces()
