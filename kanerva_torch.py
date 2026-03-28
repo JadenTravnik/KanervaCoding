@@ -3,6 +3,18 @@ import torch
 from torch import nn
 
 
+def _topk_binary_features(dist: torch.Tensor, n_prototypes: int, n_closest: int) -> torch.Tensor:
+    _, indices = torch.topk(dist, k=n_closest, dim=1, largest=False)
+    features = torch.zeros(
+        dist.shape[0],
+        n_prototypes,
+        device=dist.device,
+        dtype=torch.float32,
+    )
+    features.scatter_(1, indices, 1.0)
+    return features
+
+
 class KanervaLayer(nn.Module):
     def __init__(
         self,
@@ -62,16 +74,7 @@ class KanervaLayer(nn.Module):
             data = data.unsqueeze(0)
 
         dist = self.distance(data)
-        _, indexes = torch.topk(dist, k=self.n_closest, dim=1, largest=False)
-
-        features = torch.zeros(
-            data.shape[0],
-            self.n_prototypes,
-            device=data.device,
-            dtype=data.dtype,
-        )
-        features.scatter_(1, indexes, 1.0)
-        return features
+        return _topk_binary_features(dist, self.n_prototypes, self.n_closest).to(dtype=data.dtype)
 
 
 class KanervaBinary(nn.Module):
@@ -118,13 +121,4 @@ class KanervaBinary(nn.Module):
             data = data.unsqueeze(0)
 
         dist = self.distance(data)
-        _, indexes = torch.topk(dist, k=self.n_closest, dim=1, largest=False)
-
-        features = torch.zeros(
-            data.shape[0],
-            self.n_prototypes,
-            device=data.device,
-            dtype=torch.float32,
-        )
-        features.scatter_(1, indexes, 1.0)
-        return features
+        return _topk_binary_features(dist, self.n_prototypes, self.n_closest)

@@ -177,9 +177,14 @@ class QValueAgentTorchBinary(nn.Module):
         )
 
     def features_from_observation(self, observation: torch.Tensor) -> torch.Tensor:
+        if observation.dim() == 2 and observation.shape[0] == 1:
+            observation = observation[0]
+
+        if observation.dim() != 1:
+            raise ValueError("QValueAgentTorchBinary expects a single observation vector")
         first_features = self.kanerva_layer(observation).squeeze(0)
         second_features = self.kanerva_binary_layer(first_features).squeeze(0)
-        return torch.nonzero(second_features, as_tuple=False).squeeze(-1)
+        return torch.nonzero(second_features, as_tuple=False).flatten()
 
     def act(self, observation: torch.Tensor, greedy: bool = False) -> int:
         features = self.features_from_observation(observation)
