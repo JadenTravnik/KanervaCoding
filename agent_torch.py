@@ -106,7 +106,7 @@ class QValueAgentTorch(nn.Module):
             # calculate td_error based on current value
             td_err = reward + v_next - float(self.w[state, action].sum().item())
 
-        # the len(state) is to ensure that the total update is distributed over the feature weights
+            # normalize by active features so effective learning rate remains stable as sparsity changes
             alpha = self.alpha / len(state)
 
             # update weights

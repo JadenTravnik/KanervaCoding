@@ -119,6 +119,13 @@ def train_torch_agent(
 
 
 def moving_average(values: np.ndarray, window: int) -> np.ndarray:
+    """
+    Computes a simple moving average using convolution.
+
+    :param values: input 1D series
+    :param window: smoothing window size
+    :return: smoothed series (mode='same', so edge values are influenced by partial windows)
+    """
     if window <= 1:
         return values.copy()
     kernel = np.ones(window, dtype=np.float32) / float(window)
